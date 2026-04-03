@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Columbia Flappy Bird</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+  }
+  canvas {
+    border: 3px solid #75b8e7;
+    border-radius: 4px;
+    cursor: pointer;
+    image-rendering: pixelated;
+  }
+</style>
+</head>
+<body>
+<canvas id="game" width="400" height="600"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+
+// ─── Game States ──────────────────────────────────────────
+const STATE = { SELECT: 0, READY: 1, PLAYING: 2, GAME_OVER: 3 };
+let gameState = STATE.SELECT;
+
+// ─── Audio ────────────────────────────────────────────────
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  if (type === 'flap') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, now);
+    osc.frequency.linearRampToValueAtTime(800, now + 0.08);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.1);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  } else if (type === 'score') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.linearRampToValueAtTime(900, now + 0.1);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.15);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  } else if (type === 'crash') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, now);
+    osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.35);
+    osc.start(now);
+    osc.stop(now + 0.35);
+  }
+}
+
+// ─── Characters ───────────────────────────────────────────
+const CHARACTERS = [
+  {
+    name: 'Alex', major: 'Computer Science',
+    colors: {
+      skin: '#F5CBA7', hair: '#2C3E50', shirt: '#2980B9',
+      hoodie: '#2471A3', detail: '#1ABC9C', headphones: '#34495E',
+      eye: '#2C3E50', pants: '#2C3E50'
+    }
+  },
+  {
+    name: 'Priya', major: 'Pre-Med',
+    colors: {
+      skin: '#D4A574', hair: '#1B1B1B', shirt: '#ECF0F1',
+      coat: '#FDFEFE', detail: '#E74C3C', stethoscope: '#7F8C8D',
+      eye: '#1B1B1B', pants: '#2C3E50'
+    }
+  },
+  {
+    name: 'Jordan', major: 'English Literature',
+    colors: {
+      skin: '#FDEBD0', hair: '#A0522D', shirt: '#8E6F47',
+      jacket: '#6B4423', detail: '#F39C12', glasses: '#2C3E50',
+      eye: '#2C3E50', beret: '#8B0000', book: '#D4AC0D'
+    }
+  },
+  {
+    name: 'Sam', major: 'Engineering',
+    colors: {
+      skin: '#F0C27A', hair: '#4A3728', shirt: '#F39C12',
+      vest: '#E67E22', detail: '#F1C40F', hardhat: '#F1C40F',
+      eye: '#2C3E50', pants: '#566573'
+    }
+  },
+  {
+    name: 'Maya', major: 'Fine Arts',
+    colors: {
+      skin: '#8D6E63', hair: '#1B1B1B', shirt: '#FDFEFE',
+      smock: '#E8DAEF', detail: '#9B59B6', splat1: '#E74C3C',
+      splat2: '#3498DB', splat3: '#2ECC71', eye: '#1B1B1B',
+      beret: '#9B59B6', brush: '#F5B041'
+    }
+  }
+];
+
+let selectedChar = 0;
+let hoverChar = -1;
+
+function drawPixelChar(charIdx, x, y, scale, flapping) {
+  const c = CHARACTERS[charIdx].colors;
+  const s = scale;
+  const ps = s; // pixel size
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Body base (round-ish bird shape)
+  const bodyW = 18 * ps;
+  const bodyH = 16 * ps;
+
+  // Wing animation
+  const wingOffset = flapping ? -3 * ps : 2 * ps;
+
+  if (charIdx === 0) { // CS Student - Blue hoodie, headphones
+    // Body
+    ctx.fillStyle = c.hoodie;
+    fillRoundRect(-bodyW/2, -bodyH/2, bodyW, bodyH, 6*ps);
+    // Hoodie pocket
+    ctx.fillStyle = c.shirt;
+    ctx.fillRect(-4*ps, 2*ps, 8*ps, 4*ps);
+    // Head area
+    ctx.fillStyle = c.skin;
+    fillRoundRect(-6*ps, -bodyH/2 - 4*ps, 12*ps, 10*ps, 4*ps);
+    // Hair
+    ctx.fillStyle = c.hair;
+    fillRoundRect(-6*ps, -bodyH/2 - 5*ps, 12*ps, 5*ps, 3*ps);
+    // Headphones
+    ctx.fillStyle = c.headphones;
+    ctx.fillRect(-7*ps, -bodyH/2 - 2*ps, 2*ps, 6*ps);
+    ctx.fillRect(5*ps, -bodyH/2 - 2*ps, 2*ps, 6*ps);
+    fillRoundRect(-7*ps, -bodyH/2 - 5*ps, 14*ps, 3*ps, 2*ps);
+    // Eyes
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(-3*ps, -bodyH/2, 2*ps, 2*ps);
+    ctx.fillRect(1*ps, -bodyH/2, 2*ps, 2*ps);
+    // Laptop sticker on body
+    ctx.fillStyle = c.detail;
+    ctx.fillRect(3*ps, -2*ps, 4*ps, 3*ps);
+    // Wing
+    ctx.fillStyle = c.hoodie;
+    ctx.globalAlpha = 0.8;
+    fillRoundRect(-bodyW/2 - 4*ps, wingOffset, 6*ps, 8*ps, 3*ps);
+    ctx.globalAlpha = 1;
+  } else if (charIdx === 1) { // Pre-Med - White coat
+    // Body (white coat)
+    ctx.fillStyle = c.coat;
+    fillRoundRect(-bodyW/2, -bodyH/2, bodyW, bodyH, 6*ps);
+    // Coat details
+    ctx.fillStyle = '#BDC3C7';
+    ctx.fillRect(-1*ps, -bodyH/2 + 2*ps, 2*ps, bodyH - 4*ps);
+    // Head
+    ctx.fillStyle = c.skin;
+    fillRoundRect(-6*ps, -bodyH/2 - 4*ps, 12*ps, 10*ps, 4*ps);
+    // Hair
+    ctx.fillStyle = c.hair;
+    fillRoundRect(-6*ps, -bodyH/2 - 5*ps, 12*ps, 5*ps, 3*ps);
+    // Eyes
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(-3*ps, -bodyH/2, 2*ps, 2*ps);
+    ctx.fillRect(1*ps, -bodyH/2, 2*ps, 2*ps);
+    // Red cross / detail
+    ctx.fillStyle = c.detail;
+    ctx.fillRect(3*ps, 0, 4*ps, 1*ps);
+    ctx.fillRect(4*ps, -1*ps, 2*ps, 3*ps);
+    // Stethoscope
+    ctx.fillStyle = c.stethoscope;
+    ctx.lineWidth = ps;
+    ctx.strokeStyle = c.stethoscope;
+    ctx.beginPath();
+    ctx.arc(0, 4*ps, 3*ps, 0, Math.PI);
+    ctx.stroke();
+    // Wing
+    ctx.fillStyle = c.coat;
+    ctx.globalAlpha = 0.8;
+    fillRoundRect(-bodyW/2 - 4*ps, wingOffset, 6*ps, 8*ps, 3*ps);
+    ctx.globalAlpha = 1;
+  } else if (charIdx === 2) { // English - Beret, glasses, book
+    // Body (tweed jacket)
+    ctx.fillStyle = c.jacket;
+    fillRoundRect(-bodyW/2, -bodyH/2, bodyW, bodyH, 6*ps);
+    // Elbow patches
+    ctx.fillStyle = c.shirt;
+    ctx.fillRect(-bodyW/2, 0, 3*ps, 4*ps);
+    ctx.fillRect(bodyW/2 - 3*ps, 0, 3*ps, 4*ps);
+    // Head
+    ctx.fillStyle = c.skin;
+    fillRoundRect(-6*ps, -bodyH/2 - 4*ps, 12*ps, 10*ps, 4*ps);
+    // Hair
+    ctx.fillStyle = c.hair;
+    fillRoundRect(-5*ps, -bodyH/2 - 4*ps, 10*ps, 4*ps, 2*ps);
+    // Beret
+    ctx.fillStyle = c.beret;
+    fillRoundRect(-7*ps, -bodyH/2 - 7*ps, 14*ps, 5*ps, 3*ps);
+    ctx.fillRect(-2*ps, -bodyH/2 - 8*ps, 4*ps, 2*ps);
+    // Glasses
+    ctx.strokeStyle = c.glasses;
+    ctx.lineWidth = ps * 0.8;
+    ctx.strokeRect(-5*ps, -bodyH/2 - 1*ps, 4*ps, 3*ps);
+    ctx.strokeRect(1*ps, -bodyH/2 - 1*ps, 4*ps, 3*ps);
+    ctx.beginPath();
+    ctx.moveTo(-1*ps, -bodyH/2 + 0.5*ps);
+    ctx.lineTo(1*ps, -bodyH/2 + 0.5*ps);
+    ctx.stroke();
+    // Eyes behind glasses
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(-4*ps, -bodyH/2, 2*ps, 2*ps);
+    ctx.fillRect(2*ps, -bodyH/2, 2*ps, 2*ps);
+    // Book under wing
+    ctx.fillStyle = c.book;
+    fillRoundRect(-bodyW/2 - 2*ps, 2*ps, 5*ps, 7*ps, 1*ps);
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(-bodyW/2 - 2*ps, 2*ps, 1*ps, 7*ps);
+    // Wing
+    ctx.fillStyle = c.jacket;
+    ctx.globalAlpha = 0.8;
+    fillRoundRect(-bodyW/2 - 4*ps, wingOffset, 6*ps, 8*ps, 3*ps);
+    ctx.globalAlpha = 1;
+  } else if (charIdx === 3) { // Engineering - Hard hat, vest
+    // Body (orange vest)
+    ctx.fillStyle = c.vest;
+    fillRoundRect(-bodyW/2, -bodyH/2, bodyW, bodyH, 6*ps);
+    // Reflective stripes
+    ctx.fillStyle = c.detail;
+    ctx.fillRect(-bodyW/2 + 2*ps, 0, bodyW - 4*ps, 2*ps);
+    ctx.fillRect(-bodyW/2 + 2*ps, 4*ps, bodyW - 4*ps, 2*ps);
+    // Head
+    ctx.fillStyle = c.skin;
+    fillRoundRect(-6*ps, -bodyH/2 - 4*ps, 12*ps, 10*ps, 4*ps);
+    // Hair
+    ctx.fillStyle = c.hair;
+    fillRoundRect(-5*ps, -bodyH/2 - 3*ps, 10*ps, 3*ps, 2*ps);
+    // Hard hat
+    ctx.fillStyle = c.hardhat;
+    fillRoundRect(-7*ps, -bodyH/2 - 7*ps, 14*ps, 5*ps, 3*ps);
+    ctx.fillRect(-9*ps, -bodyH/2 - 3*ps, 18*ps, 2*ps);
+    // Eyes
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(-3*ps, -bodyH/2, 2*ps, 2*ps);
+    ctx.fillRect(1*ps, -bodyH/2, 2*ps, 2*ps);
+    // Pencil behind ear
+    ctx.fillStyle = '#F5B041';
+    ctx.fillRect(6*ps, -bodyH/2 - 4*ps, 1.5*ps, 8*ps);
+    ctx.fillStyle = '#E74C3C';
+    ctx.fillRect(6*ps, -bodyH/2 - 5*ps, 1.5*ps, 2*ps);
+    ctx.fillStyle = '#2C3E50';
+    ctx.fillRect(6*ps, -bodyH/2 + 3*ps, 1.5*ps, 1*ps);
+    // Wing
+    ctx.fillStyle = c.vest;
+    ctx.globalAlpha = 0.8;
+    fillRoundRect(-bodyW/2 - 4*ps, wingOffset, 6*ps, 8*ps, 3*ps);
+    ctx.globalAlpha = 1;
+  } else if (charIdx === 4) { // Art Student - Paint smock, beret
+    // Body (paint smock)
+    ctx.fillStyle = c.smock;
+    fillRoundRect(-bodyW/2, -bodyH/2, bodyW, bodyH, 6*ps);
+    // Paint splatters on smock
+    ctx.fillStyle = c.splat1;
+    ctx.fillRect(-4*ps, -2*ps, 3*ps, 3*ps);
+    ctx.fillStyle = c.splat2;
+    ctx.fillRect(2*ps, 1*ps, 3*ps, 2*ps);
+    ctx.fillStyle = c.splat3;
+    ctx.fillRect(-2*ps, 4*ps, 2*ps, 2*ps);
+    ctx.fillStyle = c.splat1;
+    ctx.fillRect(5*ps, -4*ps, 2*ps, 2*ps);
+    // Head
+    ctx.fillStyle = c.skin;
+    fillRoundRect(-6*ps, -bodyH/2 - 4*ps, 12*ps, 10*ps, 4*ps);
+    // Hair
+    ctx.fillStyle = c.hair;
+    fillRoundRect(-6*ps, -bodyH/2 - 5*ps, 12*ps, 5*ps, 3*ps);
+    // Beret
+    ctx.fillStyle = c.beret;
+    fillRoundRect(-8*ps, -bodyH/2 - 7*ps, 16*ps, 5*ps, 3*ps);
+    ctx.fillRect(-1*ps, -bodyH/2 - 9*ps, 2*ps, 3*ps);
+    // Eyes
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(-3*ps, -bodyH/2, 2*ps, 2*ps);
+    ctx.fillRect(1*ps, -bodyH/2, 2*ps, 2*ps);
+    // Paintbrush
+    ctx.fillStyle = c.brush;
+    ctx.save();
+    ctx.translate(bodyW/2 + 2*ps, -2*ps);
+    ctx.rotate(0.3);
+    ctx.fillRect(0, 0, 2*ps, 10*ps);
+    ctx.fillStyle = c.splat1;
+    fillRoundRect(-1*ps, -3*ps, 4*ps, 4*ps, 1*ps);
+    ctx.restore();
+    // Wing
+    ctx.fillStyle = c.smock;
+    ctx.globalAlpha = 0.8;
+    fillRoundRect(-bodyW/2 - 4*ps, wingOffset, 6*ps, 8*ps, 3*ps);
+    ctx.globalAlpha = 1;
+  }
+
+  // Beak (all characters)
+  ctx.fillStyle = '#F39C12';
+  ctx.beginPath();
+  ctx.moveTo(bodyW/2 - 2*ps, -bodyH/2 + 2*ps);
+  ctx.lineTo(bodyW/2 + 4*ps, -bodyH/2 + 4*ps);
+  ctx.lineTo(bodyW/2 - 2*ps, -bodyH/2 + 5*ps);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function fillRoundRect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.fill();
+}
+
+// ─── Columbia Backgrounds ─────────────────────────────────
+const SCENES = [
+  { name: 'Low Memorial Library', draw: drawLowLibrary },
+  { name: 'Butler Library', draw: drawButlerLibrary },
+  { name: 'College Walk', draw: drawCollegeWalk },
+  { name: 'Alma Mater', draw: drawAlmaMater },
+  { name: 'Riverside Park', draw: drawRiversidePark }
+];
+
+let currentScene = 0;
+let bgScroll = 0;
+let cloudScroll = 0;
+
+function drawSky() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H - 60);
+  grad.addColorStop(0, '#87CEEB');
+  grad.addColorStop(0.6, '#B0E0F0');
+  grad.addColorStop(1, '#E8F4F8');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H - 60);
+}
+
+function drawClouds() {
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  const clouds = [
+    { x: 50, y: 60, w: 60, h: 20 },
+    { x: 200, y: 30, w: 80, h: 25 },
+    { x: 320, y: 80, w: 50, h: 18 },
+    { x: 130, y: 100, w: 70, h: 22 },
+  ];
+  clouds.forEach(cl => {
+    const cx = ((cl.x - cloudScroll * 0.3) % (W + 100) + W + 100) % (W + 100) - 50;
+    fillRoundRect(cx, cl.y, cl.w, cl.h, cl.h / 2);
+    fillRoundRect(cx + cl.w * 0.2, cl.y - cl.h * 0.4, cl.w * 0.5, cl.h * 0.8, cl.h * 0.3);
+  });
+}
+
+function drawGround() {
+  // Brick sidewalk
+  ctx.fillStyle = '#8B7355';
+  ctx.fillRect(0, H - 60, W, 60);
+  ctx.fillStyle = '#A0896C';
+  for (let i = 0; i < W + 20; i += 20) {
+    const gx = ((i - bgScroll) % (W + 20) + W + 20) % (W + 20) - 10;
+    ctx.fillRect(gx, H - 60, 18, 8);
+    ctx.fillRect(gx + 10, H - 52, 18, 8);
+    ctx.fillRect(gx, H - 44, 18, 8);
+    ctx.fillRect(gx + 10, H - 36, 18, 8);
+    ctx.fillRect(gx, H - 28, 18, 8);
+    ctx.fillRect(gx + 10, H - 20, 18, 8);
+    ctx.fillRect(gx, H - 12, 18, 8);
+  }
+  // Grass strip
+  ctx.fillStyle = '#4A7C59';
+  ctx.fillRect(0, H - 62, W, 4);
+}
+
+function drawLowLibrary(scroll) {
+  // Low Memorial Library - dome building
+  const ox = -scroll * 0.5;
+  ctx.fillStyle = '#D5C7B5';
+  // Main building body
+  ctx.fillRect(ox + 80, H - 220, 240, 160);
+  // Columns
+  ctx.fillStyle = '#C4B5A0';
+  for (let i = 0; i < 8; i++) {
+    ctx.fillRect(ox + 95 + i * 30, H - 220, 8, 120);
+  }
+  // Steps
+  ctx.fillStyle = '#BDB0A0';
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(ox + 80 - i * 10, H - 64 + i * 3, 240 + i * 20, 6);
+  }
+  // Dome
+  ctx.fillStyle = '#A8C4A0';
+  ctx.beginPath();
+  ctx.arc(ox + 200, H - 220, 80, Math.PI, 0);
+  ctx.fill();
+  // Dome tip
+  ctx.fillStyle = '#8FB088';
+  ctx.beginPath();
+  ctx.arc(ox + 200, H - 280, 20, Math.PI, 0);
+  ctx.fill();
+  // Pediment
+  ctx.fillStyle = '#D5C7B5';
+  ctx.beginPath();
+  ctx.moveTo(ox + 90, H - 220);
+  ctx.lineTo(ox + 200, H - 260);
+  ctx.lineTo(ox + 310, H - 220);
+  ctx.fill();
+  // Windows
+  ctx.fillStyle = '#6B8CA8';
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(ox + 105 + i * 30, H - 180, 12, 20);
+  }
+}
+
+function drawButlerLibrary(scroll) {
+  const ox = -scroll * 0.5;
+  ctx.fillStyle = '#C8B8A4';
+  // Main facade
+  ctx.fillRect(ox + 40, H - 240, 320, 180);
+  // Large columns
+  ctx.fillStyle = '#B5A590';
+  for (let i = 0; i < 10; i++) {
+    ctx.fillRect(ox + 55 + i * 30, H - 240, 10, 140);
+    // Column capitals
+    ctx.fillRect(ox + 52 + i * 30, H - 240, 16, 6);
+  }
+  // Inscription area
+  ctx.fillStyle = '#D5C7B5';
+  ctx.fillRect(ox + 60, H - 250, 280, 20);
+  // "BUTLER LIBRARY" text
+  ctx.fillStyle = '#8B7D6B';
+  ctx.font = 'bold 8px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('BUTLER LIBRARY', ox + 200, H - 237);
+  ctx.textAlign = 'left';
+  // Roof line
+  ctx.fillStyle = '#A09080';
+  ctx.fillRect(ox + 35, H - 255, 330, 8);
+  // Steps
+  ctx.fillStyle = '#BDB0A0';
+  for (let i = 0; i < 5; i++) {
+    ctx.fillRect(ox + 40 - i * 5, H - 64 + i * 3, 320 + i * 10, 5);
+  }
+  // Windows
+  ctx.fillStyle = '#F8E8A0';
+  for (let i = 0; i < 8; i++) {
+    ctx.fillRect(ox + 65 + i * 35, H - 160, 14, 30);
+    ctx.fillRect(ox + 65 + i * 35, H - 120, 14, 20);
+  }
+}
+
+function drawCollegeWalk(scroll) {
+  const ox = -scroll * 0.5;
+  // Trees along the walk
+  for (let i = 0; i < 6; i++) {
+    const tx = ox + 30 + i * 70;
+    // Trunk
+    ctx.fillStyle = '#6B4423';
+    ctx.fillRect(tx, H - 160, 8, 100);
+    // Foliage
+    ctx.fillStyle = '#3D7A3D';
+    ctx.beginPath();
+    ctx.arc(tx + 4, H - 170, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2D6A2D';
+    ctx.beginPath();
+    ctx.arc(tx + 12, H - 160, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#4D8A4D';
+    ctx.beginPath();
+    ctx.arc(tx - 5, H - 155, 20, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Lamp posts
+  ctx.fillStyle = '#2C3E50';
+  for (let i = 0; i < 4; i++) {
+    const lx = ox + 80 + i * 100;
+    ctx.fillRect(lx, H - 140, 3, 80);
+    // Lamp
+    ctx.fillStyle = '#F1C40F';
+    fillRoundRect(lx - 4, H - 148, 11, 10, 3);
+    ctx.fillStyle = '#2C3E50';
+  }
+  // Benches
+  ctx.fillStyle = '#5D4037';
+  for (let i = 0; i < 3; i++) {
+    const bx = ox + 50 + i * 130;
+    ctx.fillRect(bx, H - 80, 30, 4);
+    ctx.fillRect(bx + 2, H - 76, 3, 14);
+    ctx.fillRect(bx + 25, H - 76, 3, 14);
+    ctx.fillRect(bx - 1, H - 88, 32, 4);
+  }
+}
+
+function drawAlmaMater(scroll) {
+  const ox = -scroll * 0.5;
+  // Steps behind
+  ctx.fillStyle = '#C8B8A4';
+  ctx.fillRect(ox + 100, H - 200, 200, 140);
+  ctx.fillStyle = '#BDB0A0';
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(ox + 100 - i * 8, H - 64 + i * 3, 200 + i * 16, 5);
+  }
+  // Statue base
+  ctx.fillStyle = '#8B8378';
+  ctx.fillRect(ox + 170, H - 160, 60, 40);
+  // Alma Mater figure (simplified)
+  ctx.fillStyle = '#7B8E7B';
+  // Seated body
+  fillRoundRect(ox + 178, H - 200, 44, 42, 5);
+  // Head
+  ctx.beginPath();
+  ctx.arc(ox + 200, H - 212, 12, 0, Math.PI * 2);
+  ctx.fill();
+  // Arms extended
+  ctx.fillRect(ox + 165, H - 195, 15, 6);
+  ctx.fillRect(ox + 220, H - 195, 15, 6);
+  // Crown/rays
+  ctx.fillStyle = '#A0B89A';
+  for (let i = -2; i <= 2; i++) {
+    ctx.save();
+    ctx.translate(ox + 200, H - 224);
+    ctx.rotate(i * 0.3);
+    ctx.fillRect(-1, -10, 2, 10);
+    ctx.restore();
+  }
+  // Flanking columns
+  ctx.fillStyle = '#C4B5A0';
+  ctx.fillRect(ox + 120, H - 200, 10, 140);
+  ctx.fillRect(ox + 270, H - 200, 10, 140);
+}
+
+function drawRiversidePark(scroll) {
+  const ox = -scroll * 0.5;
+  // Hudson river in background
+  ctx.fillStyle = '#5B9BD5';
+  ctx.fillRect(0, H - 150, W, 40);
+  // Waves
+  ctx.strokeStyle = '#4A8BC2';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < W; i += 20) {
+    const wx = ((i - scroll * 0.3) % W + W) % W;
+    ctx.beginPath();
+    ctx.moveTo(wx, H - 135);
+    ctx.quadraticCurveTo(wx + 5, H - 138, wx + 10, H - 135);
+    ctx.stroke();
+  }
+  // NJ skyline silhouette
+  ctx.fillStyle = '#9BB0C4';
+  const buildings = [40, 60, 35, 70, 50, 45, 65, 30, 55, 40, 70, 45];
+  buildings.forEach((bh, i) => {
+    ctx.fillRect(ox * 0.3 + i * 35, H - 150 - bh, 25, bh);
+  });
+  // Park trees
+  for (let i = 0; i < 8; i++) {
+    const tx = ox + 20 + i * 55;
+    ctx.fillStyle = '#5D4037';
+    ctx.fillRect(tx, H - 130, 5, 70);
+    ctx.fillStyle = '#2E7D32';
+    ctx.beginPath();
+    ctx.arc(tx + 2, H - 140, 25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#388E3C';
+    ctx.beginPath();
+    ctx.arc(tx + 10, H - 135, 18, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Park bench
+  ctx.fillStyle = '#4E342E';
+  ctx.fillRect(ox + 160, H - 80, 40, 4);
+  ctx.fillRect(ox + 163, H - 76, 3, 14);
+  ctx.fillRect(ox + 194, H - 76, 3, 14);
+  ctx.fillRect(ox + 158, H - 88, 44, 4);
+  // Joe's Coffee sign (far right)
+  ctx.fillStyle = '#3E2723';
+  fillRoundRect(ox + 330, H - 180, 60, 120, 4);
+  ctx.fillStyle = '#F5E6D0';
+  fillRoundRect(ox + 334, H - 176, 52, 40, 2);
+  ctx.fillStyle = '#5D4037';
+  ctx.font = 'bold 7px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText("JOE'S", ox + 360, H - 158);
+  ctx.fillText('COFFEE', ox + 360, H - 148);
+  ctx.textAlign = 'left';
+  // Door
+  ctx.fillStyle = '#2C1810';
+  fillRoundRect(ox + 348, H - 120, 24, 58, 2);
+  // Awning
+  ctx.fillStyle = '#8D6E63';
+  ctx.beginPath();
+  ctx.moveTo(ox + 325, H - 130);
+  ctx.lineTo(ox + 395, H - 130);
+  ctx.lineTo(ox + 390, H - 120);
+  ctx.lineTo(ox + 330, H - 120);
+  ctx.fill();
+}
+
+// ─── Obstacles (Textbook Stacks) ──────────────────────────
+const BOOK_COLORS = [
+  '#E74C3C', '#3498DB', '#2ECC71', '#F39C12', '#9B59B6',
+  '#1ABC9C', '#E67E22', '#34495E', '#C0392B', '#2980B9',
+  '#27AE60', '#8E44AD', '#D35400', '#16A085', '#F1C40F'
+];
+
+let pipes = [];
+const GAP_SIZE = 150;
+const PIPE_WIDTH = 55;
+let pipeTimer = 0;
+const PIPE_INTERVAL = 90; // frames between pipes
+
+function createPipe() {
+  const minTop = 80;
+  const maxTop = H - 60 - GAP_SIZE - 80;
+  const topH = minTop + Math.random() * (maxTop - minTop);
+  // Generate random book colors for this stack
+  const topBooks = [];
+  const botBooks = [];
+  const bookH = 12 + Math.random() * 6;
+  for (let y = 0; y < topH; y += bookH) {
+    topBooks.push(BOOK_COLORS[Math.floor(Math.random() * BOOK_COLORS.length)]);
+  }
+  const botTop = topH + GAP_SIZE;
+  const botH = H - 60 - botTop;
+  for (let y = 0; y < botH; y += bookH) {
+    botBooks.push(BOOK_COLORS[Math.floor(Math.random() * BOOK_COLORS.length)]);
+  }
+  pipes.push({
+    x: W + 10,
+    topH: topH,
+    botTop: botTop,
+    scored: false,
+    topBooks: topBooks,
+    botBooks: botBooks,
+    bookH: bookH
+  });
+}
+
+function drawPipe(pipe) {
+  const x = pipe.x;
+  const bw = PIPE_WIDTH;
+  const bh = pipe.bookH;
+
+  // Top stack (hanging from top)
+  let by = 0;
+  pipe.topBooks.forEach((color, i) => {
+    const h = Math.min(bh, pipe.topH - by);
+    if (h <= 0) return;
+    ctx.fillStyle = color;
+    fillRoundRect(x, by, bw, h - 1, 2);
+    // Book spine detail
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(x + 3, by + 1, 2, h - 3);
+    // Book title lines
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillRect(x + 10, by + h/2 - 1, bw - 18, 1);
+    ctx.fillRect(x + 14, by + h/2 + 2, bw - 26, 1);
+    by += bh;
+  });
+  // Shelf at bottom of top stack
+  ctx.fillStyle = '#5D4037';
+  ctx.fillRect(x - 4, pipe.topH - 4, bw + 8, 6);
+  ctx.fillStyle = '#4E342E';
+  ctx.fillRect(x - 4, pipe.topH - 4, bw + 8, 2);
+
+  // Bottom stack
+  by = pipe.botTop;
+  // Shelf at top of bottom stack
+  ctx.fillStyle = '#5D4037';
+  ctx.fillRect(x - 4, pipe.botTop - 2, bw + 8, 6);
+  ctx.fillStyle = '#4E342E';
+  ctx.fillRect(x - 4, pipe.botTop - 2, bw + 8, 2);
+  by += 4;
+  pipe.botBooks.forEach((color, i) => {
+    const h = bh;
+    ctx.fillStyle = color;
+    fillRoundRect(x, by, bw, h - 1, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(x + 3, by + 1, 2, h - 3);
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillRect(x + 10, by + h/2 - 1, bw - 18, 1);
+    ctx.fillRect(x + 14, by + h/2 + 2, bw - 26, 1);
+    by += bh;
+  });
+}
+
+// ─── Player & Physics ─────────────────────────────────────
+let player = { x: 80, y: 300, vy: 0, rotation: 0 };
+const GRAVITY = 0.45;
+const FLAP_POWER = -7.5;
+const MAX_FALL = 8;
+
+let score = 0;
+let highScore = parseInt(localStorage.getItem('columbiaFlappyHighScore')) || 0;
+let baseSpeed = 2.5;
+let gameSpeed = baseSpeed;
+let flapping = false;
+let flapTimer = 0;
+let frameCount = 0;
+
+// ─── Input ────────────────────────────────────────────────
+function handleInput() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  if (gameState === STATE.SELECT) return;
+  if (gameState === STATE.READY) {
+    gameState = STATE.PLAYING;
+    player.vy = FLAP_POWER;
+    flapping = true;
+    flapTimer = 8;
+    playSound('flap');
+    return;
+  }
+  if (gameState === STATE.PLAYING) {
+    player.vy = FLAP_POWER;
+    flapping = true;
+    flapTimer = 8;
+    playSound('flap');
+    return;
+  }
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top) * (H / rect.height);
+
+  if (gameState === STATE.SELECT) {
+    handleSelectClick(mx, my);
+    return;
+  }
+  if (gameState === STATE.GAME_OVER) {
+    handleGameOverClick(mx, my);
+    return;
+  }
+  handleInput();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top) * (H / rect.height);
+  if (gameState === STATE.SELECT) {
+    handleSelectHover(mx, my);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') {
+    e.preventDefault();
+    if (gameState === STATE.GAME_OVER) {
+      resetGame();
+      return;
+    }
+    handleInput();
+  }
+});
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  const mx = (touch.clientX - rect.left) * (W / rect.width);
+  const my = (touch.clientY - rect.top) * (H / rect.height);
+
+  if (gameState === STATE.SELECT) {
+    handleSelectClick(mx, my);
+    return;
+  }
+  if (gameState === STATE.GAME_OVER) {
+    handleGameOverClick(mx, my);
+    return;
+  }
+  handleInput();
+});
+
+// ─── Character Select ─────────────────────────────────────
+function getCharBoxes() {
+  const boxes = [];
+  const startX = 30;
+  const startY = 180;
+  const boxW = 155;
+  const boxH = 110;
+  const gap = 20;
+  for (let i = 0; i < 5; i++) {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    boxes.push({
+      x: startX + col * (boxW + gap),
+      y: startY + row * (boxH + gap),
+      w: boxW,
+      h: boxH
+    });
+  }
+  return boxes;
+}
+
+function handleSelectHover(mx, my) {
+  const boxes = getCharBoxes();
+  hoverChar = -1;
+  boxes.forEach((box, i) => {
+    if (mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h) {
+      hoverChar = i;
+    }
+  });
+}
+
+function handleSelectClick(mx, my) {
+  const boxes = getCharBoxes();
+  boxes.forEach((box, i) => {
+    if (mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h) {
+      selectedChar = i;
+      resetGame();
+      gameState = STATE.READY;
+    }
+  });
+}
+
+function drawSelectScreen() {
+  // Background
+  drawSky();
+  drawClouds();
+
+  // Dimmed overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Title
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 28px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('COLUMBIA', W/2, 60);
+  ctx.fillText('FLAPPY BIRD', W/2, 95);
+
+  // Columbia blue underline
+  ctx.fillStyle = '#75b8e7';
+  ctx.fillRect(W/2 - 120, 105, 240, 3);
+
+  ctx.font = '14px monospace';
+  ctx.fillStyle = '#D0D0D0';
+  ctx.fillText('Choose Your Student', W/2, 140);
+
+  // Character boxes
+  const boxes = getCharBoxes();
+  boxes.forEach((box, i) => {
+    const isHover = hoverChar === i;
+    // Box background
+    ctx.fillStyle = isHover ? 'rgba(117,184,231,0.3)' : 'rgba(255,255,255,0.1)';
+    fillRoundRect(box.x, box.y, box.w, box.h, 8);
+    // Border
+    ctx.strokeStyle = isHover ? '#75b8e7' : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = isHover ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(box.x + 8, box.y);
+    ctx.lineTo(box.x + box.w - 8, box.y);
+    ctx.quadraticCurveTo(box.x + box.w, box.y, box.x + box.w, box.y + 8);
+    ctx.lineTo(box.x + box.w, box.y + box.h - 8);
+    ctx.quadraticCurveTo(box.x + box.w, box.y + box.h, box.x + box.w - 8, box.y + box.h);
+    ctx.lineTo(box.x + 8, box.y + box.h);
+    ctx.quadraticCurveTo(box.x, box.y + box.h, box.x, box.y + box.h - 8);
+    ctx.lineTo(box.x, box.y + 8);
+    ctx.quadraticCurveTo(box.x, box.y, box.x + 8, box.y);
+    ctx.stroke();
+
+    // Character sprite
+    drawPixelChar(i, box.x + 40, box.y + 45, 2, false);
+
+    // Name and major
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(CHARACTERS[i].name, box.x + 75, box.y + 40);
+    ctx.fillStyle = '#AAD4F5';
+    ctx.font = '9px monospace';
+    const major = CHARACTERS[i].major;
+    ctx.fillText(major, box.x + 75, box.y + 55);
+  });
+
+  // Instructions
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Click a student to play!', W/2, H - 30);
+  ctx.textAlign = 'left';
+}
+
+// ─── Game Over ────────────────────────────────────────────
+function handleGameOverClick(mx, my) {
+  // Play Again button
+  if (mx >= W/2 - 80 && mx <= W/2 + 80 && my >= 370 && my <= 405) {
+    resetGame();
+    gameState = STATE.READY;
+    return;
+  }
+  // Change Character button
+  if (mx >= W/2 - 80 && mx <= W/2 + 80 && my >= 420 && my <= 455) {
+    resetGame();
+    gameState = STATE.SELECT;
+    return;
+  }
+}
+
+function drawGameOverScreen() {
+  // Dim overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Panel
+  ctx.fillStyle = 'rgba(30,30,60,0.9)';
+  fillRoundRect(W/2 - 120, 180, 240, 300, 12);
+  ctx.strokeStyle = '#75b8e7';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(W/2 - 120 + 12, 180);
+  ctx.lineTo(W/2 + 120 - 12, 180);
+  ctx.quadraticCurveTo(W/2 + 120, 180, W/2 + 120, 192);
+  ctx.lineTo(W/2 + 120, 468);
+  ctx.quadraticCurveTo(W/2 + 120, 480, W/2 + 108, 480);
+  ctx.lineTo(W/2 - 108, 480);
+  ctx.quadraticCurveTo(W/2 - 120, 480, W/2 - 120, 468);
+  ctx.lineTo(W/2 - 120, 192);
+  ctx.quadraticCurveTo(W/2 - 120, 180, W/2 - 108, 180);
+  ctx.stroke();
+
+  // Game Over text
+  ctx.fillStyle = '#E74C3C';
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('GAME OVER', W/2, 220);
+
+  // Character
+  drawPixelChar(selectedChar, W/2, 260, 2.5, false);
+
+  // Score
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText('Score: ' + score, W/2, 310);
+
+  // High score
+  ctx.fillStyle = '#F1C40F';
+  ctx.font = '14px monospace';
+  const isNew = score >= highScore && score > 0;
+  ctx.fillText((isNew ? '★ NEW ' : '') + 'Best: ' + highScore, W/2, 340);
+
+  // Play Again button
+  ctx.fillStyle = '#2ECC71';
+  fillRoundRect(W/2 - 80, 370, 160, 35, 6);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 13px monospace';
+  ctx.fillText('Play Again', W/2, 393);
+
+  // Change Character button
+  ctx.fillStyle = '#3498DB';
+  fillRoundRect(W/2 - 80, 420, 160, 35, 6);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText('Change Student', W/2, 443);
+
+  ctx.textAlign = 'left';
+}
+
+// ─── Reset ────────────────────────────────────────────────
+function resetGame() {
+  player = { x: 80, y: 300, vy: 0, rotation: 0 };
+  pipes = [];
+  score = 0;
+  gameSpeed = baseSpeed;
+  pipeTimer = 0;
+  bgScroll = 0;
+  cloudScroll = 0;
+  flapping = false;
+  flapTimer = 0;
+  frameCount = 0;
+  currentScene = Math.floor(Math.random() * SCENES.length);
+}
+
+// ─── Collision Detection ──────────────────────────────────
+function checkCollision() {
+  const px = player.x - 12;
+  const py = player.y - 12;
+  const pw = 24;
+  const ph = 24;
+
+  // Ground
+  if (py + ph >= H - 60) return true;
+  // Ceiling
+  if (py <= 0) return true;
+
+  for (const pipe of pipes) {
+    // Top pipe
+    if (px + pw > pipe.x && px < pipe.x + PIPE_WIDTH) {
+      if (py < pipe.topH) return true;
+      if (py + ph > pipe.botTop) return true;
+    }
+  }
+  return false;
+}
+
+// ─── Main Game Loop ───────────────────────────────────────
+function update() {
+  frameCount++;
+
+  if (gameState === STATE.SELECT) {
+    cloudScroll += 0.3;
+    return;
+  }
+
+  if (gameState === STATE.READY) {
+    cloudScroll += 0.3;
+    // Bob the player gently
+    player.y = 300 + Math.sin(frameCount * 0.05) * 10;
+    return;
+  }
+
+  if (gameState !== STATE.PLAYING) return;
+
+  // Physics
+  player.vy += GRAVITY;
+  if (player.vy > MAX_FALL) player.vy = MAX_FALL;
+  player.y += player.vy;
+
+  // Rotation
+  player.rotation = Math.min(Math.max(player.vy * 0.08, -0.5), Math.PI / 4);
+
+  // Flap animation
+  if (flapTimer > 0) flapTimer--;
+  flapping = flapTimer > 0;
+
+  // Scrolling
+  bgScroll += gameSpeed;
+  cloudScroll += gameSpeed * 0.3;
+
+  // Pipes
+  pipeTimer++;
+  if (pipeTimer >= PIPE_INTERVAL) {
+    createPipe();
+    pipeTimer = 0;
+  }
+
+  pipes.forEach(pipe => {
+    pipe.x -= gameSpeed;
+
+    // Score
+    if (!pipe.scored && pipe.x + PIPE_WIDTH < player.x) {
+      pipe.scored = true;
+      score++;
+      playSound('score');
+
+      // Speed up
+      gameSpeed = baseSpeed + score * 0.08;
+
+      // Change scene every 5 points
+      if (score % 5 === 0) {
+        currentScene = (currentScene + 1) % SCENES.length;
+      }
+
+      // Update high score
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('columbiaFlappyHighScore', highScore);
+      }
+    }
+  });
+
+  // Remove off-screen pipes
+  pipes = pipes.filter(p => p.x + PIPE_WIDTH > -10);
+
+  // Collision
+  if (checkCollision()) {
+    gameState = STATE.GAME_OVER;
+    playSound('crash');
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  if (gameState === STATE.SELECT) {
+    drawSelectScreen();
+    return;
+  }
+
+  // Background
+  drawSky();
+  drawClouds();
+  SCENES[currentScene].draw(bgScroll);
+  drawGround();
+
+  // Pipes
+  pipes.forEach(drawPipe);
+
+  // Player
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  if (gameState === STATE.PLAYING) ctx.rotate(player.rotation);
+  drawPixelChar(selectedChar, 0, 0, 2, flapping);
+  ctx.restore();
+
+  // Score display
+  if (gameState === STATE.PLAYING || gameState === STATE.GAME_OVER) {
+    // Score shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(score, W/2 + 2, 52);
+    // Score
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(score, W/2, 50);
+    ctx.textAlign = 'left';
+  }
+
+  // Ready screen overlay
+  if (gameState === STATE.READY) {
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 20px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(CHARACTERS[selectedChar].name, W/2, 200);
+    ctx.font = '13px monospace';
+    ctx.fillStyle = '#AAD4F5';
+    ctx.fillText(CHARACTERS[selectedChar].major, W/2, 222);
+
+    // Tap instruction
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 16px monospace';
+    const blink = Math.sin(frameCount * 0.08) > 0;
+    if (blink) {
+      ctx.fillText('Tap or Press Space', W/2, H - 150);
+    }
+
+    // High score
+    if (highScore > 0) {
+      ctx.fillStyle = '#F1C40F';
+      ctx.font = '12px monospace';
+      ctx.fillText('Best: ' + highScore, W/2, H - 120);
+    }
+    ctx.textAlign = 'left';
+  }
+
+  // Game over overlay
+  if (gameState === STATE.GAME_OVER) {
+    drawGameOverScreen();
+  }
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
