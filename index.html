@@ -357,33 +357,104 @@ let cloudScroll = 0;
 
 function drawSky() {
   const grad = ctx.createLinearGradient(0, 0, 0, H - 60);
-  grad.addColorStop(0, '#87CEEB');
-  grad.addColorStop(0.6, '#B0E0F0');
-  grad.addColorStop(1, '#E8F4F8');
+  grad.addColorStop(0, '#4A6FA5');
+  grad.addColorStop(0.3, '#6B8FBF');
+  grad.addColorStop(0.7, '#9BB8D8');
+  grad.addColorStop(1, '#C8D8E8');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H - 60);
 }
 
 function drawClouds() {
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
   const clouds = [
-    { x: 50, y: 60, w: 60, h: 20 },
-    { x: 200, y: 30, w: 80, h: 25 },
-    { x: 320, y: 80, w: 50, h: 18 },
-    { x: 130, y: 100, w: 70, h: 22 },
+    { x: 50, y: 40, w: 60, h: 16 },
+    { x: 200, y: 20, w: 80, h: 18 },
+    { x: 320, y: 55, w: 50, h: 14 },
   ];
   clouds.forEach(cl => {
     const cx = ((cl.x - cloudScroll * 0.3) % (W + 100) + W + 100) % (W + 100) - 50;
     fillRoundRect(cx, cl.y, cl.w, cl.h, cl.h / 2);
-    fillRoundRect(cx + cl.w * 0.2, cl.y - cl.h * 0.4, cl.w * 0.5, cl.h * 0.8, cl.h * 0.3);
+    fillRoundRect(cx + cl.w * 0.2, cl.y - cl.h * 0.3, cl.w * 0.4, cl.h * 0.6, cl.h * 0.2);
+  });
+}
+
+// Distant NYC skyline silhouette — always visible behind the scene
+function drawDistantSkyline() {
+  const scroll = cloudScroll * 0.15;
+  // Far buildings (dark silhouettes)
+  const farBuildings = [
+    { x: 0, w: 30, h: 180 }, { x: 28, w: 22, h: 220 },
+    { x: 48, w: 35, h: 160 }, { x: 80, w: 18, h: 280 }, // tall tower
+    { x: 96, w: 28, h: 200 }, { x: 122, w: 20, h: 170 },
+    { x: 140, w: 32, h: 240 }, { x: 170, w: 24, h: 190 },
+    { x: 192, w: 16, h: 300 }, // tallest spire
+    { x: 206, w: 30, h: 210 }, { x: 234, w: 22, h: 175 },
+    { x: 254, w: 28, h: 250 }, { x: 280, w: 20, h: 195 },
+    { x: 298, w: 34, h: 230 }, { x: 330, w: 18, h: 270 },
+    { x: 346, w: 26, h: 185 }, { x: 370, w: 22, h: 210 },
+    { x: 390, w: 30, h: 160 }, { x: 418, w: 20, h: 240 },
+    { x: 436, w: 28, h: 200 },
+  ];
+
+  ctx.fillStyle = '#7A8FA5';
+  farBuildings.forEach(b => {
+    const bx = ((b.x - scroll) % (W + 60) + W + 60) % (W + 60) - 30;
+    ctx.fillRect(bx, H - 60 - b.h, b.w, b.h);
+  });
+  // Tiny windows on far buildings
+  ctx.fillStyle = 'rgba(255, 240, 180, 0.25)';
+  farBuildings.forEach(b => {
+    const bx = ((b.x - scroll) % (W + 60) + W + 60) % (W + 60) - 30;
+    for (let wy = H - 60 - b.h + 8; wy < H - 80; wy += 12) {
+      for (let wx = bx + 3; wx < bx + b.w - 4; wx += 7) {
+        ctx.fillRect(wx, wy, 3, 4);
+      }
+    }
+  });
+}
+
+// Mid-distance buildings — scrolls at medium speed
+function drawMidSkyline() {
+  const scroll = bgScroll * 0.3;
+  const midBuildings = [
+    { x: 0, w: 45, h: 280, color: '#6B7B8D' },
+    { x: 42, w: 35, h: 320, color: '#5E6E7E' },
+    { x: 74, w: 50, h: 260, color: '#6B7B8D' },
+    { x: 120, w: 30, h: 350, color: '#5A6A7A' },
+    { x: 148, w: 42, h: 290, color: '#6B7B8D' },
+    { x: 188, w: 25, h: 380, color: '#566676' }, // tall
+    { x: 211, w: 38, h: 270, color: '#6B7B8D' },
+    { x: 247, w: 48, h: 310, color: '#5E6E7E' },
+    { x: 293, w: 28, h: 360, color: '#5A6A7A' },
+    { x: 319, w: 40, h: 250, color: '#6B7B8D' },
+    { x: 357, w: 32, h: 340, color: '#566676' },
+    { x: 387, w: 45, h: 280, color: '#6B7B8D' },
+    { x: 430, w: 30, h: 320, color: '#5E6E7E' },
+  ];
+
+  midBuildings.forEach(b => {
+    const bx = ((b.x - scroll) % (W + 80) + W + 80) % (W + 80) - 40;
+    ctx.fillStyle = b.color;
+    ctx.fillRect(bx, H - 60 - b.h, b.w, b.h);
+    // Roof details
+    ctx.fillStyle = '#4A5A6A';
+    ctx.fillRect(bx + 2, H - 60 - b.h, b.w - 4, 3);
+    // Windows
+    ctx.fillStyle = 'rgba(255, 240, 180, 0.35)';
+    for (let wy = H - 60 - b.h + 10; wy < H - 80; wy += 14) {
+      for (let wx = bx + 4; wx < bx + b.w - 6; wx += 9) {
+        ctx.fillRect(wx, wy, 5, 6);
+      }
+    }
   });
 }
 
 function drawGround() {
-  // Brick sidewalk
-  ctx.fillStyle = '#8B7355';
+  // Sidewalk
+  ctx.fillStyle = '#7A6B5A';
   ctx.fillRect(0, H - 60, W, 60);
-  ctx.fillStyle = '#A0896C';
+  ctx.fillStyle = '#8D7E6D';
   for (let i = 0; i < W + 20; i += 20) {
     const gx = ((i - bgScroll) % (W + 20) + W + 20) % (W + 20) - 10;
     ctx.fillRect(gx, H - 60, 18, 8);
@@ -394,232 +465,365 @@ function drawGround() {
     ctx.fillRect(gx + 10, H - 20, 18, 8);
     ctx.fillRect(gx, H - 12, 18, 8);
   }
-  // Grass strip
-  ctx.fillStyle = '#4A7C59';
-  ctx.fillRect(0, H - 62, W, 4);
+  // Curb
+  ctx.fillStyle = '#5A5045';
+  ctx.fillRect(0, H - 62, W, 3);
 }
 
 function drawLowLibrary(scroll) {
-  // Low Memorial Library - dome building
   const ox = -scroll * 0.5;
-  ctx.fillStyle = '#D5C7B5';
+  // Side wings
+  ctx.fillStyle = '#B5A590';
+  ctx.fillRect(ox + 10, H - 300, 80, 240);
+  ctx.fillRect(ox + 310, H - 300, 80, 240);
+  // Windows on wings
+  ctx.fillStyle = 'rgba(255,240,180,0.4)';
+  for (let wy = H - 280; wy < H - 80; wy += 20) {
+    for (let wx of [ox + 20, ox + 45, ox + 65, ox + 320, ox + 345, ox + 365]) {
+      ctx.fillRect(wx, wy, 10, 12);
+    }
+  }
   // Main building body
-  ctx.fillRect(ox + 80, H - 220, 240, 160);
+  ctx.fillStyle = '#D5C7B5';
+  ctx.fillRect(ox + 60, H - 360, 280, 300);
   // Columns
   ctx.fillStyle = '#C4B5A0';
-  for (let i = 0; i < 8; i++) {
-    ctx.fillRect(ox + 95 + i * 30, H - 220, 8, 120);
+  for (let i = 0; i < 9; i++) {
+    ctx.fillRect(ox + 75 + i * 30, H - 340, 10, 200);
+    // Column bases
+    ctx.fillRect(ox + 73 + i * 30, H - 140, 14, 6);
+    // Column capitals
+    ctx.fillRect(ox + 73 + i * 30, H - 342, 14, 6);
   }
   // Steps
   ctx.fillStyle = '#BDB0A0';
-  for (let i = 0; i < 4; i++) {
-    ctx.fillRect(ox + 80 - i * 10, H - 64 + i * 3, 240 + i * 20, 6);
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(ox + 60 - i * 8, H - 64 + i * 2, 280 + i * 16, 5);
   }
   // Dome
-  ctx.fillStyle = '#A8C4A0';
-  ctx.beginPath();
-  ctx.arc(ox + 200, H - 220, 80, Math.PI, 0);
-  ctx.fill();
-  // Dome tip
   ctx.fillStyle = '#8FB088';
   ctx.beginPath();
-  ctx.arc(ox + 200, H - 280, 20, Math.PI, 0);
+  ctx.arc(ox + 200, H - 360, 100, Math.PI, 0);
+  ctx.fill();
+  // Dome ribbing
+  ctx.strokeStyle = '#7A9A72';
+  ctx.lineWidth = 1;
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(ox + 200 + i * 20, H - 360);
+    ctx.quadraticCurveTo(ox + 200 + i * 10, H - 440, ox + 200, H - 460);
+    ctx.stroke();
+  }
+  // Dome lantern
+  ctx.fillStyle = '#7A9A72';
+  fillRoundRect(ox + 190, H - 475, 20, 20, 4);
+  ctx.fillStyle = '#F1C40F';
+  ctx.beginPath();
+  ctx.arc(ox + 200, H - 480, 5, 0, Math.PI * 2);
   ctx.fill();
   // Pediment
   ctx.fillStyle = '#D5C7B5';
   ctx.beginPath();
-  ctx.moveTo(ox + 90, H - 220);
-  ctx.lineTo(ox + 200, H - 260);
-  ctx.lineTo(ox + 310, H - 220);
+  ctx.moveTo(ox + 70, H - 340);
+  ctx.lineTo(ox + 200, H - 390);
+  ctx.lineTo(ox + 330, H - 340);
   ctx.fill();
+  // Inscription
+  ctx.fillStyle = '#8B7D6B';
+  ctx.font = 'bold 7px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('LOW MEMORIAL LIBRARY', ox + 200, H - 350);
+  ctx.textAlign = 'left';
   // Windows
   ctx.fillStyle = '#6B8CA8';
-  for (let i = 0; i < 6; i++) {
-    ctx.fillRect(ox + 105 + i * 30, H - 180, 12, 20);
+  for (let i = 0; i < 7; i++) {
+    ctx.fillRect(ox + 85 + i * 30, H - 280, 14, 28);
+    ctx.fillRect(ox + 85 + i * 30, H - 230, 14, 22);
   }
 }
 
 function drawButlerLibrary(scroll) {
   const ox = -scroll * 0.5;
+  // Main facade — tall
   ctx.fillStyle = '#C8B8A4';
-  // Main facade
-  ctx.fillRect(ox + 40, H - 240, 320, 180);
-  // Large columns
+  ctx.fillRect(ox + 20, H - 400, 360, 340);
+  // Upper story accent
   ctx.fillStyle = '#B5A590';
-  for (let i = 0; i < 10; i++) {
-    ctx.fillRect(ox + 55 + i * 30, H - 240, 10, 140);
-    // Column capitals
-    ctx.fillRect(ox + 52 + i * 30, H - 240, 16, 6);
+  ctx.fillRect(ox + 20, H - 400, 360, 60);
+  // Large columns
+  ctx.fillStyle = '#BDB0A0';
+  for (let i = 0; i < 12; i++) {
+    ctx.fillRect(ox + 35 + i * 28, H - 340, 12, 220);
+    ctx.fillRect(ox + 33 + i * 28, H - 342, 16, 6);
+    ctx.fillRect(ox + 33 + i * 28, H - 120, 16, 6);
   }
-  // Inscription area
+  // Inscription band
   ctx.fillStyle = '#D5C7B5';
-  ctx.fillRect(ox + 60, H - 250, 280, 20);
-  // "BUTLER LIBRARY" text
+  ctx.fillRect(ox + 30, H - 400, 340, 25);
   ctx.fillStyle = '#8B7D6B';
   ctx.font = 'bold 8px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('BUTLER LIBRARY', ox + 200, H - 237);
+  ctx.fillText('BUTLER LIBRARY', ox + 200, H - 385);
   ctx.textAlign = 'left';
-  // Roof line
+  // Roof cornice
   ctx.fillStyle = '#A09080';
-  ctx.fillRect(ox + 35, H - 255, 330, 8);
+  ctx.fillRect(ox + 15, H - 405, 370, 8);
+  ctx.fillRect(ox + 18, H - 410, 364, 5);
   // Steps
   ctx.fillStyle = '#BDB0A0';
-  for (let i = 0; i < 5; i++) {
-    ctx.fillRect(ox + 40 - i * 5, H - 64 + i * 3, 320 + i * 10, 5);
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(ox + 20 - i * 5, H - 64 + i * 2, 360 + i * 10, 5);
   }
-  // Windows
+  // Lit windows (warm glow — studying students!)
   ctx.fillStyle = '#F8E8A0';
-  for (let i = 0; i < 8; i++) {
-    ctx.fillRect(ox + 65 + i * 35, H - 160, 14, 30);
-    ctx.fillRect(ox + 65 + i * 35, H - 120, 14, 20);
+  for (let row = 0; row < 4; row++) {
+    for (let i = 0; i < 10; i++) {
+      const wy = H - 330 + row * 55;
+      ctx.fillRect(ox + 45 + i * 32, wy, 16, 35);
+      // Window dividers
+      ctx.fillStyle = '#B5A590';
+      ctx.fillRect(ox + 45 + i * 32 + 7, wy, 2, 35);
+      ctx.fillRect(ox + 45 + i * 32, wy + 16, 16, 2);
+      ctx.fillStyle = '#F8E8A0';
+    }
   }
 }
 
 function drawCollegeWalk(scroll) {
   const ox = -scroll * 0.5;
+  // Background: campus buildings lining both sides
+  // Left side — brick academic building
+  ctx.fillStyle = '#9E7E5E';
+  ctx.fillRect(ox - 20, H - 350, 120, 290);
+  ctx.fillStyle = '#8B6E4E';
+  ctx.fillRect(ox - 20, H - 355, 120, 8);
+  ctx.fillStyle = 'rgba(255,240,180,0.35)';
+  for (let wy = H - 330; wy < H - 80; wy += 22) {
+    for (let wx = ox - 10; wx < ox + 90; wx += 25) {
+      ctx.fillRect(wx, wy, 12, 14);
+    }
+  }
+  // Right side — another academic building
+  ctx.fillStyle = '#A08868';
+  ctx.fillRect(ox + 310, H - 320, 120, 260);
+  ctx.fillStyle = '#907858';
+  ctx.fillRect(ox + 310, H - 325, 120, 8);
+  ctx.fillStyle = 'rgba(255,240,180,0.35)';
+  for (let wy = H - 300; wy < H - 80; wy += 22) {
+    for (let wx = ox + 320; wx < ox + 420; wx += 25) {
+      ctx.fillRect(wx, wy, 12, 14);
+    }
+  }
   // Trees along the walk
   for (let i = 0; i < 6; i++) {
-    const tx = ox + 30 + i * 70;
-    // Trunk
-    ctx.fillStyle = '#6B4423';
-    ctx.fillRect(tx, H - 160, 8, 100);
-    // Foliage
-    ctx.fillStyle = '#3D7A3D';
-    ctx.beginPath();
-    ctx.arc(tx + 4, H - 170, 30, 0, Math.PI * 2);
-    ctx.fill();
+    const tx = ox + 110 + i * 35;
+    ctx.fillStyle = '#5D4037';
+    ctx.fillRect(tx, H - 220, 6, 160);
     ctx.fillStyle = '#2D6A2D';
     ctx.beginPath();
-    ctx.arc(tx + 12, H - 160, 22, 0, Math.PI * 2);
+    ctx.arc(tx + 3, H - 230, 28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3D7A3D';
+    ctx.beginPath();
+    ctx.arc(tx + 12, H - 220, 22, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#4D8A4D';
     ctx.beginPath();
-    ctx.arc(tx - 5, H - 155, 20, 0, Math.PI * 2);
+    ctx.arc(tx - 6, H - 215, 18, 0, Math.PI * 2);
     ctx.fill();
   }
   // Lamp posts
   ctx.fillStyle = '#2C3E50';
-  for (let i = 0; i < 4; i++) {
-    const lx = ox + 80 + i * 100;
-    ctx.fillRect(lx, H - 140, 3, 80);
-    // Lamp
+  for (let i = 0; i < 3; i++) {
+    const lx = ox + 130 + i * 70;
+    ctx.fillRect(lx, H - 180, 3, 120);
     ctx.fillStyle = '#F1C40F';
-    fillRoundRect(lx - 4, H - 148, 11, 10, 3);
+    fillRoundRect(lx - 5, H - 190, 13, 12, 4);
+    ctx.fillStyle = 'rgba(255,240,100,0.15)';
+    ctx.beginPath();
+    ctx.arc(lx + 1, H - 180, 20, 0, Math.PI * 2);
+    ctx.fill();
     ctx.fillStyle = '#2C3E50';
   }
   // Benches
   ctx.fillStyle = '#5D4037';
   for (let i = 0; i < 3; i++) {
-    const bx = ox + 50 + i * 130;
-    ctx.fillRect(bx, H - 80, 30, 4);
-    ctx.fillRect(bx + 2, H - 76, 3, 14);
-    ctx.fillRect(bx + 25, H - 76, 3, 14);
-    ctx.fillRect(bx - 1, H - 88, 32, 4);
+    const bx = ox + 120 + i * 80;
+    ctx.fillRect(bx, H - 80, 25, 3);
+    ctx.fillRect(bx + 2, H - 77, 2, 14);
+    ctx.fillRect(bx + 21, H - 77, 2, 14);
+    ctx.fillRect(bx - 1, H - 88, 27, 3);
   }
+  // Columbia gates at edges
+  ctx.fillStyle = '#4A5A6A';
+  ctx.fillRect(ox + 95, H - 200, 6, 140);
+  ctx.fillRect(ox + 310, H - 200, 6, 140);
+  // Gate finials
+  ctx.fillStyle = '#3A4A5A';
+  ctx.beginPath();
+  ctx.arc(ox + 98, H - 205, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(ox + 313, H - 205, 6, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawAlmaMater(scroll) {
   const ox = -scroll * 0.5;
-  // Steps behind
-  ctx.fillStyle = '#C8B8A4';
-  ctx.fillRect(ox + 100, H - 200, 200, 140);
-  ctx.fillStyle = '#BDB0A0';
-  for (let i = 0; i < 6; i++) {
-    ctx.fillRect(ox + 100 - i * 8, H - 64 + i * 3, 200 + i * 16, 5);
+  // Low Library behind (distant)
+  ctx.fillStyle = '#B5A896';
+  ctx.fillRect(ox + 50, H - 380, 300, 320);
+  ctx.fillStyle = '#A09884';
+  ctx.beginPath();
+  ctx.arc(ox + 200, H - 380, 70, Math.PI, 0);
+  ctx.fill();
+  // Windows on Low Library
+  ctx.fillStyle = 'rgba(255,240,180,0.3)';
+  for (let wy = H - 340; wy < H - 120; wy += 24) {
+    for (let wx = ox + 70; wx < ox + 340; wx += 30) {
+      ctx.fillRect(wx, wy, 12, 16);
+    }
   }
-  // Statue base
+  // Columns of Low
+  ctx.fillStyle = '#A09884';
+  for (let i = 0; i < 8; i++) {
+    ctx.fillRect(ox + 75 + i * 30, H - 340, 8, 180);
+  }
+  // Grand staircase
+  ctx.fillStyle = '#C8B8A4';
+  for (let i = 0; i < 10; i++) {
+    ctx.fillRect(ox + 50 - i * 6, H - 64 + i * 1.5, 300 + i * 12, 4);
+  }
+  // Statue platform
   ctx.fillStyle = '#8B8378';
-  ctx.fillRect(ox + 170, H - 160, 60, 40);
-  // Alma Mater figure (simplified)
-  ctx.fillStyle = '#7B8E7B';
-  // Seated body
-  fillRoundRect(ox + 178, H - 200, 44, 42, 5);
+  ctx.fillRect(ox + 160, H - 190, 80, 50);
+  ctx.fillStyle = '#7A7368';
+  ctx.fillRect(ox + 155, H - 195, 90, 8);
+  // Alma Mater figure
+  ctx.fillStyle = '#6B8E6B';
+  // Throne/seat
+  fillRoundRect(ox + 170, H - 240, 60, 52, 6);
+  // Body
+  fillRoundRect(ox + 180, H - 260, 40, 70, 5);
   // Head
   ctx.beginPath();
-  ctx.arc(ox + 200, H - 212, 12, 0, Math.PI * 2);
+  ctx.arc(ox + 200, H - 270, 14, 0, Math.PI * 2);
   ctx.fill();
   // Arms extended
-  ctx.fillRect(ox + 165, H - 195, 15, 6);
-  ctx.fillRect(ox + 220, H - 195, 15, 6);
+  ctx.fillRect(ox + 152, H - 248, 20, 8);
+  ctx.fillRect(ox + 228, H - 248, 20, 8);
+  // Scepter in right hand
+  ctx.fillStyle = '#8FA88F';
+  ctx.fillRect(ox + 245, H - 290, 3, 50);
   // Crown/rays
-  ctx.fillStyle = '#A0B89A';
-  for (let i = -2; i <= 2; i++) {
+  ctx.fillStyle = '#8FA88F';
+  for (let i = -3; i <= 3; i++) {
     ctx.save();
-    ctx.translate(ox + 200, H - 224);
-    ctx.rotate(i * 0.3);
-    ctx.fillRect(-1, -10, 2, 10);
+    ctx.translate(ox + 200, H - 284);
+    ctx.rotate(i * 0.25);
+    ctx.fillRect(-1, -14, 2, 14);
     ctx.restore();
   }
-  // Flanking columns
-  ctx.fillStyle = '#C4B5A0';
-  ctx.fillRect(ox + 120, H - 200, 10, 140);
-  ctx.fillRect(ox + 270, H - 200, 10, 140);
+  // Flanking decorative posts
+  ctx.fillStyle = '#9A8E82';
+  ctx.fillRect(ox + 120, H - 220, 8, 160);
+  ctx.fillRect(ox + 272, H - 220, 8, 160);
+  // Post globes
+  ctx.fillStyle = '#F1C40F';
+  ctx.beginPath();
+  ctx.arc(ox + 124, H - 226, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(ox + 276, H - 226, 7, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawRiversidePark(scroll) {
   const ox = -scroll * 0.5;
-  // Hudson river in background
-  ctx.fillStyle = '#5B9BD5';
-  ctx.fillRect(0, H - 150, W, 40);
-  // Waves
-  ctx.strokeStyle = '#4A8BC2';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < W; i += 20) {
-    const wx = ((i - scroll * 0.3) % W + W) % W;
-    ctx.beginPath();
-    ctx.moveTo(wx, H - 135);
-    ctx.quadraticCurveTo(wx + 5, H - 138, wx + 10, H - 135);
-    ctx.stroke();
-  }
-  // NJ skyline silhouette
-  ctx.fillStyle = '#9BB0C4';
-  const buildings = [40, 60, 35, 70, 50, 45, 65, 30, 55, 40, 70, 45];
-  buildings.forEach((bh, i) => {
-    ctx.fillRect(ox * 0.3 + i * 35, H - 150 - bh, 25, bh);
+  // NJ skyline — tall, filling upper area
+  ctx.fillStyle = '#8A9AAA';
+  const njBuildings = [
+    { x: -10, w: 35, h: 180 }, { x: 25, w: 25, h: 220 },
+    { x: 48, w: 40, h: 160 }, { x: 86, w: 20, h: 250 },
+    { x: 104, w: 35, h: 200 }, { x: 137, w: 28, h: 280 },
+    { x: 163, w: 40, h: 190 }, { x: 201, w: 22, h: 240 },
+    { x: 221, w: 38, h: 210 }, { x: 257, w: 20, h: 300 },
+    { x: 275, w: 32, h: 230 }, { x: 305, w: 28, h: 260 },
+    { x: 331, w: 40, h: 200 }, { x: 369, w: 22, h: 280 },
+    { x: 389, w: 35, h: 220 },
+  ];
+  njBuildings.forEach(b => {
+    const bx = ((b.x - scroll * 0.15) % (W + 60) + W + 60) % (W + 60) - 30;
+    ctx.fillStyle = '#8A9AAA';
+    ctx.fillRect(bx, H - 170 - b.h, b.w, b.h);
+    ctx.fillStyle = 'rgba(255,240,180,0.15)';
+    for (let wy = H - 170 - b.h + 8; wy < H - 185; wy += 10) {
+      for (let wx = bx + 3; wx < bx + b.w - 4; wx += 7) {
+        ctx.fillRect(wx, wy, 3, 4);
+      }
+    }
   });
-  // Park trees
-  for (let i = 0; i < 8; i++) {
-    const tx = ox + 20 + i * 55;
+  // Hudson river
+  ctx.fillStyle = '#4A7EB5';
+  ctx.fillRect(0, H - 170, W, 50);
+  // Wave reflections
+  ctx.fillStyle = 'rgba(90,150,210,0.4)';
+  for (let i = 0; i < W; i += 15) {
+    const wx = ((i - scroll * 0.4) % W + W) % W;
+    ctx.fillRect(wx, H - 160 + Math.sin(i * 0.1) * 3, 8, 2);
+    ctx.fillRect(wx + 5, H - 145 + Math.cos(i * 0.15) * 2, 6, 2);
+  }
+  // Riverside Drive buildings (foreground, left)
+  ctx.fillStyle = '#8B6E4E';
+  ctx.fillRect(ox - 20, H - 340, 90, 280);
+  ctx.fillStyle = 'rgba(255,240,180,0.4)';
+  for (let wy = H - 320; wy < H - 80; wy += 20) {
+    for (let wx = ox - 10; wx < ox + 60; wx += 20) {
+      ctx.fillRect(wx, wy, 10, 12);
+    }
+  }
+  // Park trees (foreground)
+  for (let i = 0; i < 6; i++) {
+    const tx = ox + 90 + i * 55;
     ctx.fillStyle = '#5D4037';
-    ctx.fillRect(tx, H - 130, 5, 70);
+    ctx.fillRect(tx, H - 200, 6, 140);
     ctx.fillStyle = '#2E7D32';
     ctx.beginPath();
-    ctx.arc(tx + 2, H - 140, 25, 0, Math.PI * 2);
+    ctx.arc(tx + 3, H - 210, 30, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#388E3C';
     ctx.beginPath();
-    ctx.arc(tx + 10, H - 135, 18, 0, Math.PI * 2);
+    ctx.arc(tx + 12, H - 200, 22, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Park bench
-  ctx.fillStyle = '#4E342E';
-  ctx.fillRect(ox + 160, H - 80, 40, 4);
-  ctx.fillRect(ox + 163, H - 76, 3, 14);
-  ctx.fillRect(ox + 194, H - 76, 3, 14);
-  ctx.fillRect(ox + 158, H - 88, 44, 4);
-  // Joe's Coffee sign (far right)
+  // Park path
+  ctx.fillStyle = '#9E8E7E';
+  ctx.fillRect(0, H - 70, W, 10);
+  // Joe's Coffee (right)
   ctx.fillStyle = '#3E2723';
-  fillRoundRect(ox + 330, H - 180, 60, 120, 4);
+  fillRoundRect(ox + 340, H - 260, 70, 200, 4);
   ctx.fillStyle = '#F5E6D0';
-  fillRoundRect(ox + 334, H - 176, 52, 40, 2);
+  fillRoundRect(ox + 345, H - 254, 60, 45, 2);
   ctx.fillStyle = '#5D4037';
-  ctx.font = 'bold 7px monospace';
+  ctx.font = 'bold 8px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText("JOE'S", ox + 360, H - 158);
-  ctx.fillText('COFFEE', ox + 360, H - 148);
+  ctx.fillText("JOE'S", ox + 375, H - 232);
+  ctx.fillText('COFFEE', ox + 375, H - 220);
   ctx.textAlign = 'left';
-  // Door
   ctx.fillStyle = '#2C1810';
-  fillRoundRect(ox + 348, H - 120, 24, 58, 2);
+  fillRoundRect(ox + 360, H - 130, 28, 68, 2);
   // Awning
   ctx.fillStyle = '#8D6E63';
   ctx.beginPath();
-  ctx.moveTo(ox + 325, H - 130);
-  ctx.lineTo(ox + 395, H - 130);
-  ctx.lineTo(ox + 390, H - 120);
-  ctx.lineTo(ox + 330, H - 120);
+  ctx.moveTo(ox + 335, H - 200);
+  ctx.lineTo(ox + 415, H - 200);
+  ctx.lineTo(ox + 410, H - 188);
+  ctx.lineTo(ox + 340, H - 188);
   ctx.fill();
+  // Windows above cafe
+  ctx.fillStyle = 'rgba(255,240,180,0.4)';
+  ctx.fillRect(ox + 350, H - 250, 14, 18);
+  ctx.fillRect(ox + 385, H - 250, 14, 18);
 }
 
 // ─── Obstacles (Textbook Stacks) ──────────────────────────
@@ -846,9 +1050,11 @@ function drawSelectScreen() {
   // Background
   drawSky();
   drawClouds();
+  drawDistantSkyline();
+  drawMidSkyline();
 
   // Dimmed overlay
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
   ctx.fillRect(0, 0, W, H);
 
   // Title
@@ -1108,6 +1314,8 @@ function draw() {
   // Background
   drawSky();
   drawClouds();
+  drawDistantSkyline();
+  drawMidSkyline();
   SCENES[currentScene].draw(bgScroll);
   drawGround();
 
